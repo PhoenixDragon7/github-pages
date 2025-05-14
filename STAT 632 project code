@@ -1,0 +1,822 @@
+Code for data: 
+
+standings_22
+import pandas as pd
+import requests
+import re
+
+url = "https://www.basketball-reference.com/leagues/NBA_2022_standings.html"
+
+response = requests.get(url)
+html = response.text
+
+html = re.sub("<!--|-->", "", html)
+
+tables = pd.read_html(html, skiprows=1)
+expanded = tables[4]
+expanded = expanded[['Team', 'Overall']]
+# print(expanded.head())
+
+expanded.to_csv("overall_22.csv", index=False)
+
+continuity
+import pandas as pd
+import requests
+import re
+
+url = "https://www.basketball-reference.com/friv/continuity.html"
+
+response = requests.get(url)
+html = response.text
+
+html = re.sub("<!--|-->", "", html)
+
+tables = pd.read_html(html)
+continuity_inv = tables[0]
+# print(continuity.head())
+
+output_file = "/Users/Pranav/Documents/stat632/raptor project/continuity_inv.csv"
+continuity_inv.to_csv(output_file, index=False
+
+continuity_projections
+[pandas as pd
+
+continuity_inv = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/continuity_inv.csv')
+all_standings = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/all_standings.csv')
+
+continuity = continuity_inv.melt(
+    id_vars='Season',
+    var_name='abbr',
+    value_name='continuity_pct'
+)
+
+continuity['season'] = continuity['Season'].str[:4].astype(int) + 1
+continuity['continuity_pct'] = (
+    continuity['continuity_pct'].str.rstrip('%').astype(float) / 100
+)
+continuity = continuity.drop(columns=['Season'])
+
+all_standings = all_standings.sort_values(['abbr', 'season'])
+all_standings['war_last'] = (
+    all_standings.groupby('abbr')['team_war'].shift(1)
+)
+all_standings = all_standings.dropna(subset=['war_last'])
+
+
+proj_data = pd.merge(
+    all_standings,
+    continuity,
+    on=['abbr', 'season'],
+    how='left'
+)
+
+def fix_continuity_abbr(row):
+    if row['abbr'] == 'BRK':
+        return 'NJN'
+    elif row['abbr'] == 'CHO':
+        return 'CHA'
+    elif row['abbr'] in ['NOP', 'NOK']:
+        return 'NOH'
+    elif row['abbr'] == 'SEA' and row['season'] in [2006, 2007, 2008]:
+        return 'OKC'
+    else:
+        return row['abbr']
+
+proj_data['abbr_cont'] = proj_data.apply(fix_continuity_abbr, axis=1)
+
+proj_data2 = pd.merge(
+    proj_data, continuity,
+    left_on=['abbr_cont', 'season'],
+    right_on=['abbr', 'season'],
+    how='left'
+)
+
+proj_data3 = proj_data2.drop(columns=['abbr_y', 'continuity_pct_x'])
+proj_data3 = proj_data3.rename(columns={
+    'abbr_x': 'abbr',
+    'continuity_pct_y': 'continuity_pct'
+})
+
+output_file = '/Users/Pranav/Documents/stat632/raptor project/proj_data.csv'
+proj_data3.to_csv(output_file, index=False)
+
+[10:02 PM, 5/13/2025] Pranav CSU EB: scrape_2023
+[10:02 PM, 5/13/2025] Pranav CSU EB: import pandas as pd
+import requests
+import re
+
+
+url = "https://www.basketball-reference.com/leagues/NBA_2023_standings.html"
+
+response = requests.get(url)
+html = response.text
+
+html = re.sub("<!--|-->", "", html)
+
+tables = pd.read_html(html, skiprows=1)
+df = tables[4]
+df = df[['Team', 'Overall']]
+
+df[['W', 'L']] = df['Overall'].str.split('-', expand=True)
+df['W'] = df['W'].astype(int)
+df['L'] = df['L'].astype(int)
+df['W.L.'] = (df['W'] / (df['W'] + df['L'])).round(3)
+
+standings_23 = df.drop(columns=['Overall', 'W', 'L'])
+
+df = df.sort_values(by=['Season', 'W/L%'], ascending=[True, False]).reset_index(drop=True)
+
+
+2023scrape2
+import pandas as pd
+
+df = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/df_23.csv')
+
+# overall to wl%
+df[['W', 'L']] = df['Overall'].str.split('-', expand=True)
+df['W'] = df['W'].astype(int)
+df['L'] = df['L'].astype(int)
+df['W.L.'] = (df['W'] / (df['W'] + df['L'])).round(3)
+
+wl_23 = df.drop(columns=['Overall', 'W', 'L'])
+
+# add season
+wl_23['season'] = 2023
+
+# team abbreviations
+abbr_mapping = {
+    "Atlanta Hawks": "ATL",
+    "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BRK",
+    "Chicago Bulls": "CHI",
+    "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",
+    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",
+    "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",
+    "Indiana Pacers": "IND",
+    "Kansas City Kings": "KCK",
+    "Los Angeles Clippers": "LAC",
+    "Los Angeles Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",
+    "Minnesota Timberwolves": "MIN",
+    "New Jersey Nets": "NJN",
+    "New Orleans Hornets": "NOH",
+    "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC",
+    "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHO",
+    "Portland Trail Blazers": "POR",
+    "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",
+    "San Diego Clippers": "SDC",
+    "Seattle SuperSonics": "SEA",
+    "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",
+    "Washington Wizards": "WAS",
+    "Charlotte Hornets": "CHO"
+}
+
+def map_abbr(row):
+    team = row['Team']
+    season = row['season']
+
+    return abbr_mapping[team]
+
+wl_23['abbr'] = wl_23.apply(map_abbr, axis=1)
+ # add conferences
+conf_mapping = {
+    "ATL": "E",
+    "BOS": "E",
+    "BRK": "E",
+    "CHI": "E",
+    "CHO": "E",
+    "CLE": "E",
+    "DAL": "W",
+    "DEN": "W",
+    "DET": "E",
+    "GSW": "W",
+    "HOU": "W",
+    "IND": "E",
+    "LAC": "W",
+    "LAL": "W",
+    "MEM": "W",
+    "MIA": "E",
+    "MIL": "E",
+    "MIN": "W",
+    "NOP": "W",
+    "NYK": "E",
+    "OKC": "W",
+    "ORL": "E",
+    "PHI": "E",
+    "PHO": "W",
+    "POR": "W",
+    "SAC": "W",
+    "SAS": "W",
+    "TOR": "E",
+    "UTA": "W",
+    "WAS": "E",
+}
+
+def map_conf(row):
+    abbr = row['abbr']
+
+    return conf_mapping[abbr]
+
+wl_23['conf'] = wl_23.apply(map_conf, axis=1)
+
+last_war_23
+
+import pandas as pd
+
+wl_23 = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/wl_23.csv')
+proj_data = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/proj_data.csv')
+
+# add 2022 team_war as last_war
+war_2022 = (
+    proj_data
+    .query("season == 2022")
+    [['abbr', 'team_war']]
+    .rename(columns={'team_war': 'war_last'})
+)
+
+wl_23 = wl_23.merge(war_2022, on='abbr', how='left')
+
+# abbrs needed to merge continuity values
+abbr_cont_df = proj_data[['abbr','abbr_cont']].drop_duplicates()
+wl_23 = wl_23.merge(abbr_cont_df, on='abbr', how='left')
+
+wl_23['made_playoffs'] = 0
+
+# print(wl_23.head())
+output_file = '/Users/Pranav/Documents/stat632/raptor project/wl_23.csv'
+wl_23.to_csv(output_file, index=False)
+
+continuity_23
+import pandas as pd
+
+wl_23 = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/wl_23.csv')
+proj_data = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/proj_data.csv')
+continuity_inv = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/continuity_inv.csv')
+
+continuity = continuity_inv.melt(
+    id_vars='Season',
+    var_name='abbr_cont',
+    value_name='continuity_pct'
+)
+
+continuity['season'] = continuity['Season'].str[:4].astype(int) + 1
+continuity['continuity_pct'] = (
+    continuity['continuity_pct'].str.rstrip('%').astype(float) / 100
+)
+continuity = continuity.drop(columns=['Season'])
+
+cont_23 = pd.merge(
+    wl_23,
+    continuity,
+    on=['abbr_cont', 'season'],
+    how='left'
+)
+
+Last playoffs :
+
+import pandas as pd
+
+proj_data = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/proj_data.csv')
+
+proj_data = proj_data.sort_values(['abbr', 'season'])
+
+proj_data['last_playoffs'] = (
+    proj_data
+    .groupby('abbr')['made_playoffs']
+    .shift(1)
+    .fillna(0)
+    .astype(int)
+)
+
+import pandas as pd
+import requests
+import re
+import os
+import time
+
+seasons = list(range(1980, 2023))
+
+save_folder='/Users/Pranav/Documents/stat632/raptor project'
+output_file = os.path.join(save_folder, 'nba_standings_full.csv')
+
+if os.path.exists(output_file):
+    os.remove(output_file)
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+}
+
+for season in seasons:
+    url = f"https://www.basketball-reference.com/leagues/NBA_{season}_standings.html"
+
+    try:
+        response = requests.get(url)
+        html = response.text
+        html = re.sub("<!--|-->", "", html)
+
+        tables = pd.read_html(html, skiprows=1)
+        if season <= 2015:
+            expanded = tables[2]
+        else:
+            expanded = tables[4]
+
+        expanded = expanded[['Team', 'Overall']]
+        expanded = expanded.reset_index(drop=True)
+        expanded['Season'] = season
+
+        if not os.path.exists(output_file):
+            expanded.to_csv(output_file, index=False)
+        else:
+            expanded.to_csv(output_file, mode='a', header=False, index=False)
+
+        time.sleep(1)
+
+    except Exception:
+        print(f"error in {season}")
+
+season_war_standings = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/war_standings_playoffs copy.csv')
+
+season_war_standings['season'] = season_war_standings['team_season'].str.split().str[0].astype(int)
+
+standings_finalfile_path='/Users/Pranav/Documents/stat632/raptor project/nba_standings_full.csv'
+df=pd.read_csv(file_path)
+# print(df.head())
+
+df[['W', 'L']] = df['Overall'].str.split('-', expand=True)
+df['W'] = df['W'].astype(int)
+df['L'] = df['L'].astype(int)
+df['W/L%'] = (df['W'] / (df['W'] + df['L'])).round(3)
+
+df = df.drop(columns=['Overall'])
+df = df.sort_values(by=['Season', 'W/L%'], ascending=[True, False]).reset_index(drop=True)
+
+2023 dataset: 
+mport pandas as pd
+
+proj_data = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/proj_data.csv')
+continuity = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/continuity_inv.csv')
+
+war_2022 = proj_data[proj_data['season'] == 2022][['abbr', 'team_war']]
+war_2022.rename(columns={'team_war': 'war_last'}, inplace=True)
+
+continuity_2023 = continuity[continuity['Season'] == '2023-24'].melt(
+    id_vars='Season', var_name='abbr', value_name='continuity_pct'
+)
+
+continuity_2023['continuity_pct'] = continuity_2023['continuity_pct'].str.rstrip('%').astype(float) / 100
+continuity_2023.drop(columns=['Season'], inplace=True)
+
+proj_2023 = war_2022.merge(continuity_2023, on='abbr', how='left')
+proj_2023['season'] = 2023
+
+wsp_05 = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/wsp_05.csv')
+
+wsp_05['season'] = wsp_05['team_season'].str.split().str[0].astype(int)
+sorted_05 = wsp_05.sort_values(by=['season', 'W.L.'], ascending=[True, False])
+sorted_05 = sorted_05.drop(columns=['season'])
+
+standings_final = pd.read_csv("/Users/Pranav/Documents/stat632/raptor project/standings_final.csv")
+
+team_abbr_mapping = {
+    "Atlanta Hawks": "ATL",
+    "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BRK",
+    "Chicago Bulls": "CHI",
+    "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",
+    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",
+    "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",
+    "Indiana Pacers": "IND",
+    "Kansas City Kings": "KCK",
+    "Los Angeles Clippers": "LAC",
+    "Los Angeles Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",
+    "Minnesota Timberwolves": "MIN",
+    "New Jersey Nets": "NJN",
+    "New Orleans Hornets": "NOH",
+    "New Orleans/Oklahoma City Hornets": "NOK",
+    "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC",
+    "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHO",
+    "Portland Trail Blazers": "POR",
+    "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",
+    "San Diego Clippers": "SDC",
+    "Seattle SuperSonics": "SEA",
+    "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",
+    "Vancouver Grizzlies": "VAN",
+    "Washington Wizards": "WAS",
+    "Washington Bullets": "WSB",
+    "Charlotte Bobcats": "CHA"
+}
+
+
+def map_team_abbr(row):
+    team = row['Team']
+    season = row['Season']
+
+    if team == "Charlotte Hornets":
+        if season <= 2002:
+            return "CHH"  # Original Hornets (pre-relocation)
+        else:
+            return "CHO"  # Modern Hornets (post-Bobcats)
+    else:
+        return team_abbr_mapping[team]
+
+standings_final['team_abbr'] = standings_final.apply(map_team_abbr, axis=1)
+standings_final['team_season'] = standings_final['Season'].astype(str) + " " + standings_final['team_abbr']
+
+standings=standings_final[['team_season', 'W/L%']]
+
+mport pandas as pd
+
+conf_sws = pd.read_csv("/Users/Pranav/Documents/stat632/raptor project/final_05.csv")
+
+conf_sws['abbr'] = conf_sws['team_season'].str.split().str[1]
+
+conf_mapping = {
+    "ATL": "E",
+    "BOS": "E",
+    "BRK": "E",
+    "CHI": "E",
+    "CLE": "E",
+    "DAL": "W",
+    "DEN": "W",
+    "DET": "E",
+    "GSW": "W",
+    "HOU": "W",
+    "IND": "E",
+    "LAC": "W",
+    "LAL": "W",
+    "MEM": "W",
+    "MIA": "E",
+    "MIL": "E",
+    "MIN": "W",
+    "NJN": "E",
+    "NOH": "W",
+    "NOK": "W",
+    "NOP": "W",
+    "NYK": "E",
+    "OKC": "W",
+    "ORL": "E",
+    "PHI": "E",
+    "PHO": "W",
+    "POR": "W",
+    "SAC": "W",
+    "SAS": "W",
+    "SEA": "W",
+    "TOR": "E",
+    "UTA": "W",
+    "WAS": "E",
+    "CHA": "E",
+    "CHH": "E",
+    "CHO": "E"
+}
+
+def map_conf(row):
+    abbr = row['abbr']
+
+    return conf_mapping[abbr]
+
+conf_sws['conf'] = conf_sws.apply(map_conf, axis=1)
+
+conf_sws['season'] = conf_sws['team_season'].str.split().str[0].astype(int)
+
+raptor_vals
+
+import pandas as pd
+
+raptor_df = pd.read_csv('/Users/Pranav/Documents/stat632/raptor project/historicalraptor.csv')
+
+remove everything before 1979-80
+raptor_df = raptor_df[raptor_df['season'] >= 1980].reset_index(drop=True)
+
+separate bobcats and hornets
+def cha_fix(row):
+    if row['team'] == "CHA" and row['season'] >= 2015:
+        return "CHO"
+    else:
+        return row['team']
+raptor_df['team'] = raptor_df.apply(cha_fix, axis=1)
+
+#keep columns
+keep = ['player_name', 'team', 'season','season_type', 'raptor_total', 'war_reg_season']
+raptor_df = raptor_df[keep]
+
+# drop playoffs
+raptor_df = raptor_df[raptor_df['season_type'] != "PO"].reset_index(drop=True)
+
+team-season column
+raptor_df['Team_Season'] = raptor_df['season'].astype(str) + " " + raptor_df['team']
+raptor_df = raptor_df.sort_values(by=['season', 'team', 'war_reg_season'], ascending=[True, True, False]).reset_index(drop=True)
+raptor_df = raptor_df.drop(columns=['team', 'season'])
+
+raptor_df.to_csv("/Users/Pranav/Documents/stat632/raptor project/historicalraptor.csv", index=False)
+
+rounded_war = raptor_df.drop(columns=['raptor_total'])
+rounded_war['war_reg_season'] = rounded_war['war_reg_season'].round(2)
+
+
+
+Code for Analysis : 
+
+team war totals
+{r}
+rounded_war <- read.csv('rounded_war.csv')
+library(dplyr)
+
+team_war_total <- rounded_war %>%
+  group_by(team_season) %>%
+  summarize(team_war = sum(war_reg_season))
+team_war_total
+head(team_war_total)
+
+
+merge
+{r}
+standings <- read.csv('standings_abbr.csv')
+
+war_standings <- merge(standings, team_war_total, by='team_season', all.x=TRUE)
+
+write.csv(war_standings, "/Users/Pranav/Documents/stat632/raptor project/war_standings.csv",
+          row.names = FALSE, quote = FALSE)
+
+
+```{r}
+war_standings <- read.csv('war_standings.csv')
+war_standings <- war_standings[207:nrow(war_standings), ]
+war_standings$made_playoffs <- 0
+write.csv(war_standings,"/Users/Pranav/Documents/stat632/raptor project/war_standings_playoffs.csv",
+          row.names = FALSE, quote = FALSE)
+wsp_05 <- war_standings_playoffs[449:nrow(war_standings_playoffs), ]
+write.csv(wsp_05, "/Users/Pranav/Documents/stat632/raptor project/wsp_05.csv",
+          row.names=FALSE, quote=FALSE)
+
+
+playoffs check
+{r}
+final_05 <- read.csv('/Users/Pranav/Documents/stat632/raptor project/sorted_05.csv')
+print(sum(final_05$made_playoffs == 1))
+
+
+subset train and test sets
+{r}
+train_05 <- final_05[1:510, ]
+test_05 <- final_05[511:nrow(final_05), ]
+
+
+linear model to predict win% in 2022
+{r}
+lm1_train <- lm(W.L.~team_war, data=train_05)
+summary(lm1_train)
+#new_x <- data.frame(test_05$team_war)
+
+predict_22_pct <- predict(lm1_train, test_05)
+
+all_predict <- predict(lm1_train, conf_sws)
+
+
+plot
+{r}
+library(ggplot2)
+plot(test_05$W.L., predict_22_pct,
+     xlab='Actual Win %', ylab='Predicted Win %')
+abline(0,1, lty=2)
+
+plot(conf_sws$W.L.~all_predict, xlim=c(0,1), ylim=c(0,1),
+     xlab='Actual Win %', ylab='Predicted Win %', 
+     main="Predicted vs Actual Win % for All Teams 2005-2022")
+abline(0,1, lty=2)
+
+ggplot(conf_sws, aes(W.L., all_predict)) + 
+  geom_point(size=0.7) +
+  geom_abline(intercept=0, slope=1, color='blue3',
+              size=0.5) +
+  facet_wrap(~season) +
+  labs(title='Year by Year Win % Predictions',
+       x = 'Actual Win %',
+       y = 'Predicted Win %')
+
+slr diagnostics
+{r}
+plot(lm1_train, 1:2)
+plot(resid(lm1_train)~predict(lm1_train))
+
+library(ggplot2)
+library(dplyr)
+library(teamcolors)
+
+nba_colors <- teamcolors %>%
+  filter(league == "nba") %>%
+  mutate(team_abbr = c("ATL","BOS","BRK","CHO","CHI","CLE","DAL","DEN","DET",
+                       "GSW","HOU","IND","LAC","LAL","MEM","MIA","MIL","MIN",
+                       "NOP","NYK","OKC","ORL","PHI","PHO","POR","SAC","SAS",
+                       "TOR","UTA","WAS")) %>%
+  select(team_abbr, primary)
+
+test_05 <- test_05 %>%
+  left_join(nba_colors, by = c("team" = "team_abbr")) %>%
+  mutate(team = reorder(team, -win_diff, FUN = identity))
+
+ggplot(test_05, aes(x = team, y = win_diff, fill = team)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_manual(values = setNames(test_05$primary, test_05$team)) +
+  labs(x = "Team", y = "Predicted - Actual Wins", title = "Win Difference by NBA Team") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+logisitic regression
+{r}
+glm_train <- glm(made_playoffs~team_war, data=train_05, family=binomial)
+summary(glm_train)
+
+test_probs <- predict(glm_train, test_05, type='response')
+test_preds <- rep(0, 30)
+test_preds[test_probs > 0.7] <- 1
+
+cm <- table(prediction=test_preds,
+            actual=test_05$made_playoffs)
+addmargins(cm)
+
+ggplot(test_05, aes(team_war, made_playoffs)) + geom_point() +
+  geom_smooth(method='glm', method.args=list(family='binomial'), se=F) +
+  ylab('Probability of Making the Playoffs') + xlab('Team WAR')
+
+ggplot(final_05, aes(team_war, made_playoffs)) + geom_point() +
+  geom_smooth(method='glm', method.args=list(family='binomial'), se=F) 
+
+
+roc curve
+{r}
+library(pROC)
+roc_obj <- roc(test_05$made_playoffs, test_probs)
+plot(1-roc_obj$specificities, roc_obj$sensitivities, type="l",
+     xlab='1-Specificity', ylab='Sensitivity')
+points(x = 2/14, y = 14/16, col="red", pch=16)
+abline(0, 1, lty=2)
+auc(roc_obj)
+
+export final_05
+{r}
+write.csv(final_05, "/Users/Pranav/Documents/stat632/raptor project/final_05.csv",
+          row.names=FALSE, quote=FALSE)
+
+
+facet_wrap logisitic
+{r}
+conf_sws <- read.csv('/Users/Pranav/Documents/stat632/raptor project/conf_sws.csv')
+
+ggplot(conf_sws, aes(team_war, made_playoffs)) + geom_point() +
+  geom_smooth(method='glm', method.args=list(family='binomial'), se=F) +
+  facet_wrap(~season) + 
+  ylab('Probability of Making the Playoffs') + xlab('Team WAR')
+
+
+test and training sets with conferences
+{r}
+train_conf <- conf_sws[1:510, ]
+test_conf <- conf_sws[511:nrow(conf_sws), ]
+
+
+logistic regression with conferences
+{r}
+library(dplyr)
+library(ggplot2)
+
+glm2 <- glm(made_playoffs ~ team_war, data = train_conf, family = binomial)
+summary(glm2)
+
+test_conf$probs <- predict(glm2, test_conf, type = 'response')
+test_conf <- test_conf %>%
+  group_by(conf) %>%
+  mutate(rank = rank(-probs, ties.method = "first"),
+         preds = ifelse(rank <= 8, 1, 0))
+
+cm <- table(prediction = test_conf$preds, actual = test_conf$made_playoffs)
+addmargins(cm)
+
+ggplot(test_conf, aes(team_war, made_playoffs)) + geom_point(aes(color=factor(preds)), size=1.5) +
+  geom_smooth(method='glm', method.args=list(family='binomial'), se=F, color='gray40', linewidth=0.75) +
+  scale_color_discrete(labels = c("0" = "Missed", "1" = "Made")) +
+  labs(title='2022 Playoff Predictions',
+       x = 'Team WAR',
+       y = 'Made Playoffs',
+       color = 'Playoff Prediction')
+
+conf_sws2 <- conf_sws
+conf_sws2$probs <- predict(glm2, conf_sws2, type = 'response')
+conf_sws2 <- conf_sws2 %>%
+  group_by(season, conf) %>%
+  mutate(rank = rank(-probs, ties.method = "first"),
+         preds = ifelse(rank <= 8, 1, 0))
+cm <- table(prediction = conf_sws2$preds, actual = conf_sws2$made_playoffs)
+addmargins(cm)
+
+ggplot(conf_sws2, aes(team_war, made_playoffs)) + geom_point(aes(color=factor(preds)), size=0.7) +
+  geom_smooth(method='glm', method.args=list(family='binomial'), se=F, color='gray40', linewidth=0.5) +
+  facet_wrap(~season) +
+  labs(title='Year by Year Playoff Predictions',
+       x = "Team WAR",
+       y = "Made Playoffs",
+       color = "Playoff Prediction")
+
+proj_data <- read.csv('/Users/Pranav/Documents/stat632/raptor project/proj_data.csv')
+
+
+projections linear model
+
+{r}
+lm_proj1 <- lm(W.L.~war_last*continuity_pct, data=proj_data)
+summary(lm_proj1)
+
+lm_proj2 <- lm(W.L.~war_last+continuity_pct, data=proj_data)
+summary(lm_proj2)
+
+
+diagnostics
+{r}
+plot(lm_proj2, 1:2)
+
+
+{r}
+library(ggplot2)
+library(dplyr)
+
+proj_data$predicted_pct <- predict(lm_proj2, proj_data)
+
+ggplot(proj_data, aes(x=W.L., y=predicted_pct)) +
+  geom_point(size = 0.7) +
+  geom_abline(intercept = 0, slope = 1, size = 0.5, color='blue3') +
+  facet_wrap(~season) +
+  labs(
+    title = "Predicted vs Actual Win Percentage by Season",
+    x = "Actual Win %",
+    y = "Predicted Win %"
+  )
+
+plot(predicted_pct~W.L., data=proj_data,
+     xlim=c(0,1), ylim=c(0,1))
+abline(0,1, lty=2)
+
+2023 predictions
+{r}
+cont_23 <- read.csv('/Users/Pranav/Documents/stat632/raptor project/cont_23.csv')
+
+
+{r}
+cont_23$predicted_pct <- predict(lm_proj2, cont_23)
+
+plot(predicted_pct~W.L., data=cont_23,
+     xlim=c(0,1), ylim=c(0,1),xlab='Actual 2023 WL%', ylab='Predicted 2023 WL%',
+     main='2023 WL% Predictions')
+abline(0,1, lty=2)
+
+
+bar chart 2023
+{r}
+win_diff23 <- (cont_23$predicted_pct-cont_23$W.L.) * 82
+
+
+{r}
+library(ggplot2)
+library(dplyr)
+library(teamcolors)
+
+nba_colors <- teamcolors %>%
+  filter(league == "nba") %>%
+  mutate(team_abbr = c("ATL","BOS","BRK","CHO","CHI","CLE","DAL","DEN","DET",
+                       "GSW","HOU","IND","LAC","LAL","MEM","MIA","MIL","MIN",
+                       "NOP","NYK","OKC","ORL","PHI","PHO","POR","SAC","SAS",
+                       "TOR","UTA","WAS")) %>%
+  select(team_abbr, primary)
+
+cont_23 <- cont_23 %>%
+  left_join(nba_colors, by = c("abbr" = "team_abbr")) %>%
+  mutate(abbr = reorder(abbr, -win_diff23))
+
+ggplot(cont_23, aes(x = abbr, y = win_diff23, fill = abbr)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_manual(values = setNames(cont_23$primary, cont_23$abbr)) +
+  labs(x = "Team", y = "Predicted - Actual Wins", title = "2023 Projections vs Actual") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)
+
